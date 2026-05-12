@@ -32,3 +32,34 @@ void setup() {
   digitalWrite(motorIN1, HIGH);
   digitalWrite(motorIN2, LOW);
 }
+
+void loop() {
+  manejarBoton();
+
+  int adc = analogRead(pinSensor);
+  float voltaje = adc * 5.0 / 1023.0;
+
+  // Para sensor TMP36 de Tinkercad
+  float temperatura = (voltaje - 0.5) * 100.0;
+
+  int pwm = calcularPWM(temperatura);
+
+  analogWrite(motorPWM, pwm);
+  // prender led depende de la temperatura
+  if (pwm == 0) {
+    digitalWrite(ledVerde, HIGH);
+    digitalWrite(ledRojo, LOW);
+  } else {
+    digitalWrite(ledVerde, LOW);
+    digitalWrite(ledRojo, HIGH);
+  }
+
+  Serial.print("ADC: ");
+  Serial.print(adc);
+  Serial.print(" | Temp: ");
+  Serial.print(temperatura);
+  Serial.print(" C | PWM: ");
+  Serial.println(pwm);
+
+  delay(300);
+}

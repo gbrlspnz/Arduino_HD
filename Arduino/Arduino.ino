@@ -79,23 +79,3 @@ int calcularPWM(float temperatura) {
 
 return 255;
 }
-
-void manejarBoton() {
-  bool lecturaActual = digitalRead(pinBoton) {
-
-  if (lecturaActual != ultimoEstadoBoton) {
-    ultimoTiempoCambio = millis();
-  }
-
-  if ((millis() - ultimoTiempoCambio) > tiempoDebounce) {
-    if (lecturaActual != estadoBotonEstable){
-      estadoBotonEstable = lecturaActual;
-
-      if (estadoBotonEstable == LOW) {
-        modoManual = !modoManual;
-      }
-    }
-  }
-
-  ultimoEstadoBoton = lecturaActual;
-}

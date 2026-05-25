@@ -63,3 +63,39 @@ void loop() {
 
   delay(300);
 }
+
+int calcularPWM(float temperatura) {
+  if (modoManual) {
+    return 255;
+  }
+
+  if (temperatura < umbral) {
+    return 0;
+  }
+
+  if (temperatura < umbral) {
+    return map(temperatura, 30, 40, 90, 180);
+  }
+
+return 255;
+}
+
+void manejarBoton() {
+  bool lecturaActual = digitalRead(pinBoton) {
+
+  if (lecturaActual != ultimoEstadoBoton) {
+    ultimoTiempoCambio = millis();
+  }
+
+  if ((millis() - ultimoTiempoCambio) > tiempoDebounce) {
+    if (lecturaActual != estadoBotonEstable){
+      estadoBotonEstable = lecturaActual;
+
+      if (estadoBotonEstable == LOW) {
+        modoManual = !modoManual;
+      }
+    }
+  }
+
+  ultimoEstadoBoton = lecturaActual;
+}

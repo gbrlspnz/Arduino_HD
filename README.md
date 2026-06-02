@@ -1,2 +1,2 @@
 # Arduino_HD
-Testeo arduino para clase de hardware digital
+Tarea N°1 para la clase de Hardware Digital

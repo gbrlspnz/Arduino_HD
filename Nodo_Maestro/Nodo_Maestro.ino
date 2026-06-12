@@ -1,7 +1,7 @@
 // --- PINES DE CONEXIÓN ---
 const int pinBoton = 2;
 const int pinLedVerde = 5;  
-const int pinLedRojo = 6;   
+const int pinLedRojo = 6;    
 const int motorPWM = 11;
 const int motorIN1 = 9;
 const int motorIN2 = 8;
@@ -12,15 +12,14 @@ float umbral = 20.0;
 bool modoManual = false;
 int velocidadMotor = 0;
 
-// Variables Botón
+// Antirrebote del Botón
 bool estadoBotonEstable = HIGH; 
 bool ultimoEstadoBoton = HIGH;
 unsigned long ultimoTiempoCambio = 0;
 unsigned long tiempoDebounce = 50; 
 
-// --- VARIABLES UART Y PROTOCOLO ---
+// Control UART
 unsigned long ultimaPeticion = 0;
-const unsigned long intervaloPeticion = 1500; // Pedir datos cada 1.5 segundos (más calmado)
 bool esperandoRespuesta = false;
 unsigned long tiempoEspera = 0;
 bool errorComunicacion = false;
@@ -31,7 +30,6 @@ void setup() {
   pinMode(pinBoton, INPUT_PULLUP);
   pinMode(pinLedRojo, OUTPUT);
   pinMode(pinLedVerde, OUTPUT);
-  
   pinMode(motorPWM, OUTPUT);
   pinMode(motorIN1, OUTPUT);
   pinMode(motorIN2, OUTPUT);
@@ -42,51 +40,44 @@ void setup() {
 
 void loop() {
   manejarBoton();
+  procesarUART(); 
   
-  // PARCHE TINKERCAD: Forzamos la ejecución de la lectura serial
-  serialEvent(); 
-  
-  if (millis() - ultimaPeticion >= intervaloPeticion) {
-    pedirTemperatura();
+  // 1. Petición de datos al Esclavo (cada 1.5s)
+  if (millis() - ultimaPeticion >= 1500) {
+    byte trama[] = {0xAA, 0x01, 0x00, 0x01};
+    Serial.write(trama, 4);
     ultimaPeticion = millis();
     esperandoRespuesta = true;
     tiempoEspera = millis();
   }
   
-  // TIMEOUT AUMENTADO: Le damos 1000ms al simulador para responder
-  if (esperandoRespuesta && (millis() - tiempoEspera > 1000)) {
+  // 2. Timeout de seguridad
+  if (esperandoRespuesta && (millis() - tiempoEspera > 2000)) {
     errorComunicacion = true; 
     esperandoRespuesta = false;
   }
   
+  // 3. Lógica de Actuadores
   if (errorComunicacion) {
     velocidadMotor = 0;
     digitalWrite(pinLedVerde, LOW);
-    
-    // Parpadeo Rojo de Error
-    if ((millis() / 250) % 2 == 0) {
-      digitalWrite(pinLedRojo, HIGH);
-    } else {
-      digitalWrite(pinLedRojo, LOW);
-    }
+    // Parpadeo rojo de error
+    digitalWrite(pinLedRojo, ((millis() / 250) % 2 == 0) ? HIGH : LOW);
   } else {
-    // Funcionamiento normal sincronizado
     if (modoManual) {
+      // Modo Manual Activo
       velocidadMotor = 180;
       digitalWrite(pinLedRojo, HIGH);
       digitalWrite(pinLedVerde, LOW);
     } else {
+      // Modo Automático
       if (temperatura < umbral) {
         velocidadMotor = 0;
         digitalWrite(pinLedRojo, LOW);
-        digitalWrite(pinLedVerde, HIGH); // Debería encender verde aquí!
-      } else if (temperatura < 40.0) {
-        velocidadMotor = map(temperatura, 20, 40, 90, 180);
-        digitalWrite(pinLedRojo, HIGH);
-        digitalWrite(pinLedVerde, LOW);
+        digitalWrite(pinLedVerde, HIGH); // Todo normal (Verde)
       } else {
-        velocidadMotor = 180;
-        digitalWrite(pinLedRojo, HIGH);
+        velocidadMotor = 180; 
+        digitalWrite(pinLedRojo, HIGH); // Alerta temperatura (Rojo)
         digitalWrite(pinLedVerde, LOW);
       }
     }
@@ -95,41 +86,35 @@ void loop() {
   analogWrite(motorPWM, velocidadMotor);
 }
 
-void pedirTemperatura() {
-  byte sof = 0xAA;
-  byte id = 0x01;
-  byte len = 0x00;
-  byte chk = id ^ len;
-  
-  Serial.write(sof);
-  Serial.write(id);
-  Serial.write(len);
-  Serial.write(chk);
-}
+// --- FUNCIONES SECUNDARIAS ---
 
-void serialEvent() {
-  // Mientras tengamos datos, procesamos
-  while (Serial.available() > 0) {
+void procesarUART() {
+  while (Serial.available() >= 5) {
     if (Serial.peek() == 0xAA) {
-      // Si encontramos el inicio, salimos para procesar el resto en el loop
-      return; 
+      Serial.read(); 
+      byte id = Serial.read();
+      byte len = Serial.read();
+      byte data = Serial.read();
+      byte chkRecibido = Serial.read();
+      
+      if ((id ^ len ^ data) == chkRecibido && id == 0x02) {
+        temperatura = (float)data; 
+        errorComunicacion = false; 
+        esperandoRespuesta = false;
+      }
     } else {
-      // Si no es 0xAA, es basura, la eliminamos y seguimos buscando
       Serial.read(); 
     }
   }
 }
+
 void manejarBoton() {
   bool lecturaActual = digitalRead(pinBoton);
-  if (lecturaActual != ultimoEstadoBoton) {
-    ultimoTiempoCambio = millis();
-  }
+  if (lecturaActual != ultimoEstadoBoton) { ultimoTiempoCambio = millis(); }
   if ((millis() - ultimoTiempoCambio) > tiempoDebounce) {
     if (lecturaActual != estadoBotonEstable) {
       estadoBotonEstable = lecturaActual;
-      if (estadoBotonEstable == LOW) {
-        modoManual = !modoManual;
-      }
+      if (estadoBotonEstable == LOW) { modoManual = !modoManual; }
     }
   }
   ultimoEstadoBoton = lecturaActual;
